@@ -1,3 +1,5 @@
+const Dummy = require("../models/dummyModel").dummy;
+
 var express = require('express');
 var router = express.Router();
 
