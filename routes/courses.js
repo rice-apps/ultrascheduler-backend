@@ -3,6 +3,45 @@ const Course = require("../models/coursesModel").course;
 var express = require("express");
 var router = express.Router();
 
+
+var BIGJSON = require("../python_scripts/output1.json")
+
+var jsonToSchema = (jsonObj) => {
+    // for course name in json 
+    //     //create course schema
+    //     for term  
+    //         for session in term 
+    //             add a session schema thing to the Array
+
+    //    return asfc 101 Object
+
+    // https://stackoverflow.com/questions/40102372/find-one-or-create-with-mongoose 
+
+    // Iterate through each course code in the json
+    for (let courseCode in jsonObj) {
+        // create course object for this key
+        // inside each course code, we want to extract each term
+        for (let term in jsonObj[courseCode]) {
+            // inside each term, we have an array of sessions (individual classes) which we want to extract as session objects
+            for (let session of jsonObj[courseCode][term]) {
+                // 1: we want to find the instructors associated with this session - so we will check our Mongo collection for them and if they are not there, we will create them
+                // 2: Create session object to be added to this particular course object
+                var tempObj = {
+                    term: String,
+                    crn: Number,
+                    instructors: [{ type: Schema.Types.ObjectID, ref: Instructor }]
+                }
+            }
+        }
+    }
+
+
+}
+
+router.get("/processJSON", (req, res, next) => {
+    jsonToSchema(BIGJSON);
+});
+
 router.post("/create", (req, res, next) => {
   Course.create({
     subject: "LING",
