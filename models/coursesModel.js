@@ -8,15 +8,20 @@ const Instructor = require("../models/instructorsModel").instructor;
 var SessionSchema = new Schema({
     // startTime: Number,
     // endTime: Number, 
-    term: String,
     crn: Number, 
     instructors: [{type: Schema.Types.ObjectID, ref: Instructor}]
+})
+
+var TermSchema = new Schema({
+    term: String,
+    sessions: [ SessionSchema ]
 })
 
 var CourseSchema = new Schema({
     subject: String,
     courseNum: Number,
-    sessions: [ SessionSchema ],
+    longTitle: String,
+    terms: [ TermSchema ],
 });
 
 var Course = mongoose.model("courses", CourseSchema);
