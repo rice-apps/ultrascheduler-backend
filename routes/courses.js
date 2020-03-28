@@ -1,90 +1,259 @@
 const Course = require("../models/coursesModel").course;
+const Instructor = require("../models/instructorsModel").instructor;
 
 var express = require("express");
 var router = express.Router();
 
 
+
 var BIGJSON = require("../python_scripts/output1.json")
 
-var jsonToSchema = (jsonObj) => {
-    // for course name in json 
-    //     //create course schema
-    //     for term  
-    //         for session in term 
-    //             add a session schema thing to the Array
+var jsonToSchema = async (jsonObj) => {
+		// for course name in json 
+		//     //create course schema
+		//     for term  
+		//         for session in term 
+		//             add a session schema thing to the Array
 
-    //    return asfc 101 Object
+		//    return asfc 101 Object
 
-    // https://stackoverflow.com/questions/40102372/find-one-or-create-with-mongoose 
+		// https://stackoverflow.com/questions/40102372/find-one-or-create-with-mongoose 
 
-    // Iterate through each course code in the json
-    for (let courseCode in jsonObj) {
-        // create course object for this key
-        // inside each course code, we want to extract each term
-        for (let term in jsonObj[courseCode]) {
-            // inside each term, we have an array of sessions (individual classes) which we want to extract as session objects
-            for (let session of jsonObj[courseCode][term]) {
-                // 1: we want to find the instructors associated with this session - so we will check our Mongo collection for them and if they are not there, we will create them
-                // 2: Create session object to be added to this particular course object
-                var tempObj = {
-                    term: String,
-                    crn: Number,
-                    instructors: [{ type: Schema.Types.ObjectID, ref: Instructor }]
-                }
-            }
-        }
-    }
+		// Iterate through each course code in the json
+		console.log("Inside json processing")
+		for (let courseCode in jsonObj) {
+				// create course object for this key
+				// inside each course code, we want to extract each term
+				// Split course code
+				let courseArr = courseCode.split(" ");
+				let subject = courseArr[0];
+				let courseNum = courseArr[1];
+				let foundCourse = await Course.findOne({ "subject": subject, "courseNum": courseNum });
+				
+				let courseObject;
+				let newObject;
+				if (foundCourse) {
+					courseObject = foundCourse;
+					newObject = false;
+				} else {
+					courseObject = {
+						subject: subject,
+						courseNum: courseNum,
+						longTitle: "",
+						terms: []
+					};
+					newObject = true;
+				}
+				
+				for (let termStr in jsonObj[courseCode]) {
+					// Check to see if this term is already inside of the retrieved object
+					let foundTerm = false;
+					if (!newObject) {
+						for (let term of courseObject.terms) {
+							if (term["term"] == termStr) {
+								// Skip
+								foundTerm = true;
+							}
+						}
+					}
+
+					// If the term doesn't already exist, create it
+					if (!foundTerm) {
+						let termObject = {
+							"term": termStr,
+							"sessions": []
+						};
+						let sessions = [];
+						// inside each term, we have an array of sessions (individual classes) which we want to extract as session objects
+						for (let session of jsonObj[courseCode][termStr]) {
+								// 1: we want to find the instructors associated with this session - so we will check our Mongo collection for them and if they are not there, we will create them
+								let instructorRefs = [];
+								for (let instructor of session.instructors) {
+									let nameArr = instructor.split(", ");
+									let lastName = nameArr[0];
+									let firstName = nameArr[1];
+									let foundInstructor = await Instructor.findOne({"firstName": firstName, "lastName": lastName});
+									let ref;
+									if (foundInstructor) {
+										// Instructor exists! Get their ref
+										ref = foundInstructor._id;
+									} else {
+										// Create instructor & get their ID
+										foundInstructor = await Instructor.create({"firstName": firstName, "lastName": lastName});
+										ref = foundInstructor._id;
+									}
+									instructorRefs.push(ref);
+								}
+								// 2: Create session object to be added to this particular course object
+								
+								// Add session to sessions for term
+								sessions.push({
+									"crn": session.crn,
+									"instructors": instructorRefs
+								});
+	
+								// Check if longTitle has been created so far
+								if (courseObject["longTitle"] == "") {
+									courseObject["longTitle"] = session.long_title
+								}
+	
+						}
+	
+						termObject["sessions"] = sessions;
+	
+						console.log(sessions);
+	
+						// Add to courseObject
+						courseObject.terms.push(termObject);
+					}
+					
+				}
+				
+				if (newObject) {
+					// Add courseObject to Mongo
+					Course.create(courseObject);
+				} else {
+					let query = {"_id": courseObject._id};
+					let update = {
+						"$set": {
+							"terms": courseObject.terms
+						}
+					};
+					Course.findOneAndUpdate(query, update);
+				}
+
+				break;
+				
+				// if (courseCode == "ANTH 201") {
+				// 	break;
+				// }
+		}
 
 
 }
 
 router.get("/processJSON", (req, res, next) => {
-    jsonToSchema(BIGJSON);
+		jsonToSchema(BIGJSON);
+		res.json("Meme")
 });
 
-router.post("/create", (req, res, next) => {
-  Course.create({
-    subject: "LING",
-    courseNum: 200,
-    sessions: [
-      {
-        term: "Fall 2019",
-        crn: 12345,
-        instructors: ["5e5abaa2d4873ee728f7c85e"]
-      }
-    ]
-  });
+// router.post("/create", (req, res, next) => {
+// 	Course.create({
+// 		subject: "LING",
+// 		courseNum: 200,
+// 		sessions: [
+// 			{
+// 				term: "Fall 2019",
+// 				crn: 12345,
+// 				instructors: ["5e5abaa2d4873ee728f7c85e"]
+// 			}
+// 		]
+// 	});
 
-  res.send("Created new course.");
+// 	res.json("Created new course.");
+// });
+
+router.get("/getSingleCourse", (req, res, next) => {
+	let querySubject = req.query.subject;
+	let queryCourseCode = req.query.code;
+	Course.find({ subject: querySubject.toUpperCase(), courseNum: queryCourseCode })
+		.populate({ path: "terms.sessions.instructors" })
+		.exec((err, course) => {
+			if (err) {
+				res.json("ERROR!");
+			} else {
+				res.json(course);
+			}
+		});
 });
 
-router.get("/getCourse", (req, res, next) => {
-  Course.find({ subject: "LING" })
-    .populate({ path: "sessions.instructors", select: "lastName" })
-    .exec((err, course) => {
-      if (err) {
-        res.send("ERROR!");
-      } else {
-        res.json(course);
-      }
-    });
+router.get("/getCoursesBySubject", (req, res, next) => {
+	let querySubject = req.query.subject;
+	Course.find({ subject: querySubject.toUpperCase() })
+		.populate({ path: "terms.sessions.instructors" })
+		.exec((err, course) => {
+			if (err) {
+				res.json("ERROR!");
+			} else {
+				res.json(course);
+			}
+		});
 });
+
+router.get("/getCoursesByTerm", (req, res, next) => {
+	let queryTerm = req.query.term;
+	Course.find({ "terms.term": queryTerm })
+		.populate({ path: "terms.sessions.instructors" })
+		.exec((err, course) => {
+			if (err) {
+				res.json("ERROR!");
+			} else {
+				res.json(course);
+			}
+		})
+});
+
+router.get("/getCoursesByInstructor", async (req, res, next) => {
+	let queryInstructorFName = req.query.firstname;
+	let queryInstructorLName = req.query.lastname;
+	// Find the corresponding instructor 
+	let queryInstructor = await Instructor.findOne({ "firstName": queryInstructorFName, "lastName": queryInstructorLName });
+
+	Course.find({ "terms.sessions.instructors": queryInstructor._id})
+		.populate({ path: "terms.sessions.instructors" })
+		.exec((err, courses) => {
+			if (err) {
+				res.json("ERROR!");
+			} else {
+				// This part is required because we get ALL courses which this prof teaches, BUT it still includes sessions which they do not teach.
+
+				// Iterate thru each course they teach
+				for (let course of courses) {
+					// Iterate through each term of this course
+					for (let term of course["terms"]) {
+
+						// We'll be adding ONLY the sessions which the queried instructor teaches to this array
+						let newSessions = [];
+
+						// Iterate through each existing session of the term
+						for (let session of term["sessions"]) {
+							// Iterate through each instructor object of the session
+							for (let instructorObject of session["instructors"]) {
+								// Compare the ID of the instructor for this session and the queried instructor ID
+								if (String(instructorObject._id) === String(queryInstructor._id)) {
+									// If they match, add this session to the pruned sessions array
+									newSessions.push(session);
+								}
+							}
+						}
+						
+						// Post-pruning, set the sessions array to only those sessions which the queried instructor teaches
+						term["sessions"] = newSessions;
+					}
+				}
+
+				// Return the courses with pruned sessions
+				res.json(courses);
+			}
+		})
+});
+
 
 // requires req to specify filters and changes to be made
 // req.body.filter is an object
-router.put("/update", (req, res, next) => {
-  console.log(req.body);
-  console.log(req.body.filter);
-  Course.updateMany(req.body.filter, req.body.changes, {
-    new: true
-  }).exec((err, course) => {
-    if (err) {
-      res.send("ERROR!");
-    } else {
-      res.json(course);
-    }
-  });
-});
+// router.put("/update", (req, res, next) => {
+// 	console.log(req.body);
+// 	console.log(req.body.filter);
+// 	Course.updateMany(req.body.filter, req.body.changes, {
+// 		new: true
+// 	}).exec((err, course) => {
+// 		if (err) {
+// 			res.json("ERROR!");
+// 		} else {
+// 			res.json(course);
+// 		}
+// 	});
+// });
 
 // router.delete("/delete", (req, res, next) => {
 //     Course.find({ subject: "COMP" })
