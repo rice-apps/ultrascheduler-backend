@@ -4,6 +4,7 @@ const Instructor = require("../models/instructorsModel").instructor;
 var express = require("express");
 var router = express.Router();
 
+// var Set = require("collections/set");
 
 
 var BIGJSON = require("../python_scripts/output1.json")
@@ -176,6 +177,29 @@ router.get("/getCoursesBySubject", (req, res, next) => {
 				res.json("ERROR!");
 			} else {
 				res.json(course);
+			}
+		});
+});
+
+/**
+ * Return unique list of all subjects (COMP, APPL, etc)
+ */
+router.get("/getAllSubjects", (req, res, next) => {
+	// Get all courses
+	let allSubjects = new Set();
+	Course.find({})
+		.populate({ path: "terms.sessions.instructors" })
+		.exec((err, courses) => {
+			if (err) {
+				res.json("ERROR!");
+			} else {
+				// Iterate thru and add each subject to a set
+				for (course of courses) {
+					// Get subject
+					allSubjects = allSubjects.add(course["subject"]);
+				}
+				// Return set to frontend
+				res.json({ "subjects": [...allSubjects] });
 			}
 		});
 });

@@ -12,12 +12,26 @@ var authenticationRouter = require('./routes/authentication');
 
 var app = express();
 
+// Enable cross orgin resource sharing
+const enableCORS = function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", req.headers.origin);
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+  if (req.method === "OPTIONS") {
+       res.status(200).send('OK')
+  } else {
+       next();
+  }
+}
+
 // view engine setup
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(enableCORS);
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
