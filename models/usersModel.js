@@ -16,6 +16,7 @@ var UserSchema = new Schema({
     lastName: { type: String },
     majors: [ { type: String, maxlength: 4 } ],
     schedules: [ ScheduleSchema ],
+    token: { type: String }
 })
 
 var User = mongoose.model("users", UserSchema);

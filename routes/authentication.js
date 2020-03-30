@@ -1,15 +1,40 @@
 var express = require('express');
 var router = express.Router();
 
+// This will be created when the user logs in
+const jwt = require('jsonwebtoken');
+
 var request = require('request');
 var xmlParser = require('xml2js').parseString;
 var stripPrefix = require('xml2js').processors.stripPrefix;
 
-// var User = require('../models/userModel').user;
+var User = require('../models/usersModel').user;
 
 let config = {
     CASValidateURL: 'https://idp.rice.edu/idp/profile/cas/serviceValidate',
     thisServiceURL: 'http://localhost:8080/auth',
+    secret: 'testsec'
+}
+
+const getOrCreateToken = async (user) => {
+    // Verify token
+    return jwt.verify(user.token, config.secret, async (err, decoded) => {
+        let token;
+        if (err) {
+            // Create token
+            token = jwt.sign({
+                id: user._id,
+                netid: user.netid
+            }, config.secret, { expiresIn: 129600 });
+            
+            // Save token with user
+            user.token = token;
+            await user.save();
+        } else {
+            token = user.token;
+        }
+        return token;
+    })
 }
 
 /* GET home page. */
@@ -43,12 +68,11 @@ router.get('/login', function(req, res, next) {
                             return res.status(500).json({ success: false, message: "User DNE" });
                         }
                         else {
-                            // var token = jwt.sign({
-                            //     data: authSucceded,
-                            //     userID: user._id
-                            // }, config.secret);
+                            // Check if user has a token; if not, create for them
+                            let token = getOrCreateToken(user);
+
                             res.sendJSON({
-                                user
+                                token
                             });
                             // sendJSON(res, user._id, authSucceded.user, token);
                         }
@@ -63,6 +87,15 @@ router.get('/login', function(req, res, next) {
     } else {
         return res.status(400).json({ success: false, message: "No Ticket Found!" });
     }
+});
+
+router.get('/dummy', (req, res, next) => {
+    User.findOne({ netid: "wsm3" })
+    .then(async (user) => {
+        console.log(user);
+        let token = await getOrCreateToken(user);
+        res.send(token);
+    });
 });
 
 module.exports = router;
