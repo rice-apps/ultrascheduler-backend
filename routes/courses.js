@@ -7,7 +7,7 @@ var router = express.Router();
 // var Set = require("collections/set");
 
 
-var BIGJSON = require("../python_scripts/output1.json")
+var BIGJSON = require("../python_scripts/output5.json")
 
 var jsonToSchema = async (jsonObj) => {
 		// for course name in json 
@@ -21,7 +21,6 @@ var jsonToSchema = async (jsonObj) => {
 		// https://stackoverflow.com/questions/40102372/find-one-or-create-with-mongoose 
 
 		// Iterate through each course code in the json
-		console.log("Inside json processing")
 		for (let courseCode in jsonObj) {
 				// create course object for this key
 				// inside each course code, we want to extract each term
@@ -45,7 +44,7 @@ var jsonToSchema = async (jsonObj) => {
 					};
 					newObject = true;
 				}
-				
+
 				for (let termStr in jsonObj[courseCode]) {
 					// Check to see if this term is already inside of the retrieved object
 					let foundTerm = false;
@@ -86,9 +85,31 @@ var jsonToSchema = async (jsonObj) => {
 									instructorRefs.push(ref);
 								}
 								// 2: Create session object to be added to this particular course object
+								let classObject = {};
+								let labObject = {};
+
+								// Create class object
+								if (session["class_days"] && session["class_days"].length > 0) {
+									classObject = {
+										"startTime": session["class_start_time"],
+										"endTime": session["class_end_time"],
+										"days": session["class_days"]
+									};
+								}
+
+								// Create lab object
+								if (session["lab_days"] && session["lab_days"].length > 0) {
+									labObject = {
+										"startTime": session["lab_start_time"],
+										"endTime": session["lab_end_time"],
+										"days": session["lab_days"]
+									};
+								}
 								
 								// Add session to sessions for term
 								sessions.push({
+									"class": classObject,
+									"lab": labObject,
 									"crn": session.crn,
 									"instructors": instructorRefs
 								});
@@ -101,8 +122,6 @@ var jsonToSchema = async (jsonObj) => {
 						}
 	
 						termObject["sessions"] = sessions;
-	
-						console.log(sessions);
 	
 						// Add to courseObject
 						courseObject.terms.push(termObject);
@@ -120,22 +139,25 @@ var jsonToSchema = async (jsonObj) => {
 							"terms": courseObject.terms
 						}
 					};
-					Course.findOneAndUpdate(query, update);
+					await Course.findOneAndUpdate(query, update);
 				}
 
-				break;
+				// break;
 				
-				// if (courseCode == "ANTH 201") {
-				// 	break;
-				// }
+				if (courseCode == "ANTH 201") {
+					break;
+				}
 		}
 
 
 }
 
-router.get("/processJSON", (req, res, next) => {
-		jsonToSchema(BIGJSON);
-		res.json("Meme")
+router.get("/processJSON", async (req, res, next) => {
+	for (let termCourses of BIGJSON["data"]) {
+		console.log(Object.keys(termCourses).length)
+		await jsonToSchema(termCourses);
+	}
+	res.json("Meme")
 });
 
 // router.post("/create", (req, res, next) => {
@@ -208,11 +230,19 @@ router.get("/getCoursesByTerm", (req, res, next) => {
 	let queryTerm = req.query.term;
 	Course.find({ "terms.term": queryTerm })
 		.populate({ path: "terms.sessions.instructors" })
-		.exec((err, course) => {
+		.exec((err, courses) => {
 			if (err) {
 				res.json("ERROR!");
 			} else {
-				res.json(course);
+				for (let course of courses) {
+					for (let term of course["terms"]) {
+						if (term.term == queryTerm) {
+							course["terms"] = term;
+							break;
+						}
+					}
+				}
+				res.json(courses);
 			}
 		})
 });
