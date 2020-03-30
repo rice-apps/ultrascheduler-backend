@@ -5,9 +5,14 @@ require('../db')
 
 const Course = require("../models/coursesModel").course;
 
+var DraftCourseSchema = new Schema({
+    visible: { type: Boolean },
+    course: { type: Schema.Types.ObjectID, ref: Course }
+})
+
 var ScheduleSchema = new Schema({
     term: { type: String },
-    courses: [ {type: Schema.Types.ObjectID, ref: Course } ]
+    courses: [ DraftCourseSchema ]
 })
 
 var UserSchema = new Schema({
