@@ -6,7 +6,6 @@ var router = express.Router();
 
 // var Set = require("collections/set");
 
-
 var BIGJSON = require("../python_scripts/output5.json")
 
 var jsonToSchema = async (jsonObj) => {
@@ -207,44 +206,32 @@ router.get("/getCoursesBySubject", (req, res, next) => {
  * Return unique list of all subjects (COMP, APPL, etc)
  */
 router.get("/getAllSubjects", (req, res, next) => {
-	// Get all courses
-	let allSubjects = new Set();
-	Course.find({})
-		.populate({ path: "terms.sessions.instructors" })
-		.exec((err, courses) => {
-			if (err) {
-				res.json("ERROR!");
-			} else {
-				// Iterate thru and add each subject to a set
-				for (course of courses) {
-					// Get subject
-					allSubjects = allSubjects.add(course["subject"]);
-				}
-				// Return set to frontend
-				res.json({ "subjects": [...allSubjects] });
-			}
-		});
+	// Gets all unique values of the subject field
+	Course.collection.distinct("subject")
+	.then((uniqueSubjects) => {
+		// Return the array
+		res.json(uniqueSubjects);
+	})
 });
 
 router.get("/getCoursesByTerm", (req, res, next) => {
 	let queryTerm = req.query.term;
-	Course.find({ "terms.term": queryTerm })
-		.populate({ path: "terms.sessions.instructors" })
-		.exec((err, courses) => {
-			if (err) {
-				res.json("ERROR!");
-			} else {
-				for (let course of courses) {
-					for (let term of course["terms"]) {
-						if (term.term == queryTerm) {
-							course["terms"] = term;
-							break;
-						}
-					}
-				}
-				res.json(courses);
-			}
-		})
+	let courses = Course.collection.aggregate([
+		{ $match: {"terms.term": queryTerm}},
+		{ $project: {
+			subject: '$subject',
+			courseNum: '$courseNum',
+			longTitle: '$longTitle',
+			terms: {$filter: {
+				input: '$terms',
+				as: 'termObject',
+				cond: {$eq: ['$$termObject.term', queryTerm]}
+			}}
+		}}
+	]);
+	courses.toArray().then(courses => {
+		res.json(courses);
+	});
 });
 
 router.get("/getCoursesByInstructor", async (req, res, next) => {
@@ -252,6 +239,69 @@ router.get("/getCoursesByInstructor", async (req, res, next) => {
 	let queryInstructorLName = req.query.lastname;
 	// Find the corresponding instructor 
 	let queryInstructor = await Instructor.findOne({ "firstName": queryInstructorFName, "lastName": queryInstructorLName });
+	console.log(queryInstructor);
+	let courses = Course.collection.aggregate([
+		{ $match: {"terms.sessions.instructors": queryInstructor._id } },
+		{ $project: {
+			subject: '$subject',
+			courseNum: '$courseNum',
+			longTitle: '$longTitle',
+			terms: {$map: {
+				input: '$terms',
+				as: 'terms',
+				in: {
+					term: '$$terms.term',
+					sessions: {
+						$filter: {
+							input: {$map: {
+								input: '$$terms.sessions',
+								as: 'sessions',
+								in: {$cond: [
+									{$in: [queryInstructor._id, '$$sessions.instructors']},
+									{
+										_id: "$$sessions._id",
+										crn: "$$sessions.crn",
+										class: "$$sessions.class",
+										lab: "$$sessions.lab",
+										instructors: "$$sessions.instructors"
+									},
+									false
+								]}
+							}},
+							as: 'ssn',
+							cond: '$$ssn'
+							// input: '$$terms.sessions',
+							// as: 's',
+							// cond: {
+							// 	$ifNull: [
+							// 		{
+							// 			$filter: {
+							// 				input: '$$s.instructors',
+							// 				as: 'instructors',
+							// 				cond: {$eq: [queryInstructor._id, '$$instructors']}
+							// 			}
+							// 		},
+							// 		false
+							// 	]
+							// }
+						}
+					}
+				}
+				// cond: {$filter: {
+				// 	input: '$terms.sessions.instruc'
+				// }}
+				// as: 'termObject',
+				// cond: {$in: [{$toString: queryInstructor._id}, '$terms.sessions.instructor' ] }
+				// cond: {$ne: ['$terms.sessions.instructors', []]}
+			}
+		}}
+	}
+	]);
+
+	courses.toArray().then(courses => {
+		res.json(courses);
+	});
+	return;
 
 	Course.find({ "terms.sessions.instructors": queryInstructor._id})
 		.populate({ path: "terms.sessions.instructors" })
