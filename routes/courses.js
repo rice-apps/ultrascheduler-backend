@@ -270,76 +270,23 @@ router.get("/getCoursesByInstructor", async (req, res, next) => {
 							}},
 							as: 'ssn',
 							cond: '$$ssn'
-							// input: '$$terms.sessions',
-							// as: 's',
-							// cond: {
-							// 	$ifNull: [
-							// 		{
-							// 			$filter: {
-							// 				input: '$$s.instructors',
-							// 				as: 'instructors',
-							// 				cond: {$eq: [queryInstructor._id, '$$instructors']}
-							// 			}
-							// 		},
-							// 		false
-							// 	]
-							// }
 						}
 					}
 				}
-				// cond: {$filter: {
-				// 	input: '$terms.sessions.instruc'
-				// }}
-				// as: 'termObject',
-				// cond: {$in: [{$toString: queryInstructor._id}, '$terms.sessions.instructor' ] }
-				// cond: {$ne: ['$terms.sessions.instructors', []]}
 			}
+		}}},
+		{ $lookup: {
+			from: "instructors",
+            localField: "terms.sessions.instructors",
+            foreignField: "_id",
+            as: "terms.sessions.instructors"
 		}}
-	}
 	]);
 
 	courses.toArray().then(courses => {
 		res.json(courses);
 	});
 	return;
-
-	Course.find({ "terms.sessions.instructors": queryInstructor._id})
-		.populate({ path: "terms.sessions.instructors" })
-		.exec((err, courses) => {
-			if (err) {
-				res.json("ERROR!");
-			} else {
-				// This part is required because we get ALL courses which this prof teaches, BUT it still includes sessions which they do not teach.
-
-				// Iterate thru each course they teach
-				for (let course of courses) {
-					// Iterate through each term of this course
-					for (let term of course["terms"]) {
-
-						// We'll be adding ONLY the sessions which the queried instructor teaches to this array
-						let newSessions = [];
-
-						// Iterate through each existing session of the term
-						for (let session of term["sessions"]) {
-							// Iterate through each instructor object of the session
-							for (let instructorObject of session["instructors"]) {
-								// Compare the ID of the instructor for this session and the queried instructor ID
-								if (String(instructorObject._id) === String(queryInstructor._id)) {
-									// If they match, add this session to the pruned sessions array
-									newSessions.push(session);
-								}
-							}
-						}
-						
-						// Post-pruning, set the sessions array to only those sessions which the queried instructor teaches
-						term["sessions"] = newSessions;
-					}
-				}
-
-				// Return the courses with pruned sessions
-				res.json(courses);
-			}
-		})
 });
 
 
