@@ -24,6 +24,37 @@ router.get('/schedules/:s', async (req, res, next) => {
 	}
 });
 
+router.get('/', (req, res, next) => {
+	User.find({}).then(users => {
+		console.log(users);
+		res.send(users);
+	})
+})
+
+// /* POST users listing. */
+// router.post('/schedule', async (req, res, next) => {
+// 	// Check user
+// 	let { id, netid } = req.user;
+
+// 	// Get corresponding user object
+// 	let user = await User.findById(id);
+
+// 	// POST their schedule
+// 	let schedule = req.body.schedule;
+
+// 	// Send their schedule(s)
+// 	if (req.params.s == "") {
+// 		// Return all
+// 		res.json(user.schedules);
+// 	} else {
+// 		if (req.params.s < user.schedules.length) {
+// 			res.json(user.schedules[req.params.s]);
+// 		} else {
+// 			res.status(400);
+// 		}
+// 	}
+// });
+
 router.get('/info', async (req, res, next) => {
 	// Get id from JWT
 	let {id, netid} = req.user;
@@ -49,16 +80,16 @@ router.put('/logout', async (req, res, next) => {
 	res.status(200);
 });
 
-// router.delete('/deleteUser', (req, res, next) => {
-// 	// Get id from JWT
-// 	let {id, netid} = req.user;
+router.delete('/deleteUser', (req, res, next) => {
+	// Get id from JWT
+	let {id, netid} = req.user;
 
-// 	// Remove corresponding user object
-// 	User.findByIdAndDelete(id)
-// 		.exec((err, removed) => {
-// 			res.status(200).send(removed);
-// 		});
-// });
+	// Remove corresponding user object
+	User.findByIdAndDelete(id)
+		.exec((err, removed) => {
+			res.status(200).send(removed);
+		});
+});
 
 // router.post('/create', async (req, res, next) => {
 //     let user = await User.create({

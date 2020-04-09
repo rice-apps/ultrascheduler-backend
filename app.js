@@ -5,6 +5,7 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 const jwt = require('jsonwebtoken');
 var exjwt = require('express-jwt');
+var cors = require('cors')
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -23,8 +24,8 @@ var app = express();
 
 // Enable cross orgin resource sharing
 const enableCORS = function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", req.headers.origin);
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  res.header("Access-Control-Allow-Origin", '*');
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, x-ticket, x-token, Content-Type, Accept, Authorization");
   res.header("Access-Control-Allow-Credentials", "true");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
   if (req.method === "OPTIONS") {
@@ -41,7 +42,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 // app.use(exjwt({secret: 'testsec'}).unless({ path: ['/auth/login', '/auth/dummy'] })); // Will always check for auth token except for login
-// app.use(enableCORS);
+app.use(enableCORS);
 
 app.use('/', indexRouter);
 app.use('/users', exjwt({secret: 'testsec'}), usersRouter);
@@ -56,7 +57,6 @@ app.use(function(req, res, next) {
 
 // error handler
 app.use(function(err, req, res, next) {
-  console.log(req.headers);
   if (err.name === 'UnauthorizedError') { // Send the error rather than to show it on the console
     res.status(401).send(err);
     return;
