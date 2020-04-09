@@ -47,7 +47,7 @@ const getOrCreateToken = async (user) => {
 
 router.get('/verify', (req, res, next) => {
     // Get token from header
-    let token = req.get('Authorization');
+    let token = req.get('X-Token');
 
     console.log(token);
 
