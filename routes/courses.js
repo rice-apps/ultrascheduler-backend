@@ -6,7 +6,7 @@ var router = express.Router();
 
 // var Set = require("collections/set");
 
-var BIGJSON = require("../python_scripts/output5.json")
+var BIGJSON = require("../python_scripts/output1.json")
 
 var jsonToSchema = async (jsonObj) => {
 		// for course name in json 
@@ -212,6 +212,27 @@ router.get("/getAllSubjects", (req, res, next) => {
 		// Return the array
 		res.json(uniqueSubjects);
 	})
+});
+
+router.get("/searchCourses", (req, res, next) => {
+	let queryTerm = req.query.term;
+	let querySubject = req.query.subject ? req.query.subject : "";
+	let courses = Course.collection.aggregate([
+		{ $match: {"terms.term": queryTerm, "subject":querySubject.toUpperCase()}},
+		{ $project: {
+			subject: '$subject',
+			courseNum: '$courseNum',
+			longTitle: '$longTitle',
+			terms: {$filter: {
+				input: '$terms',
+				as: 'termObject',
+				cond: {$eq: ['$$termObject.term', queryTerm]}
+			}}
+		}}
+	]);
+	courses.toArray().then(courses => {
+		res.json(courses);
+	});
 });
 
 router.get("/getCoursesByTerm", (req, res, next) => {
